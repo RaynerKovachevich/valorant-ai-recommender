@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import random
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -10,19 +9,21 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 # -----------------------------
 df = pd.read_csv("valorant_dataset.csv")
 
-# Features and Targets
-X = df[["playstyle", "preferred_role", "favorite_map", "weapon_preference", "combat_distance", "dpi", "edpi"]]
+# Features and targets
+categorical_cols = ["playstyle", "preferred_role", "favorite_map", "aim_type"]
+numeric_cols = ["edpi", "ability_usage", "aggressiveness", "hours_played"]
+
+X = df[categorical_cols + numeric_cols]
 y_agent = df["recommended_agent"]
-y_sens = df["sens"]
+y_sens = df["sens_800"]  # Using sens_800 as reference sensitivity
 
 # -----------------------------
-# 2. Convert categorical to numbers
+# 2. Encode categorical features
 # -----------------------------
-categorical_cols = ["playstyle", "preferred_role", "favorite_map", "weapon_preference", "combat_distance"]
 encoder = OneHotEncoder(sparse_output=False)
 X_encoded = encoder.fit_transform(X[categorical_cols])
 
-X_final = np.hstack([X_encoded, X[["dpi", "edpi"]].values])
+X_final = np.hstack([X_encoded, X[numeric_cols].values])
 
 # -----------------------------
 # 3. Split dataset
@@ -34,46 +35,52 @@ X_train, X_test, y_agent_train, y_agent_test, y_sens_train, y_sens_test = train_
 # -----------------------------
 # 4. Train models
 # -----------------------------
-# RandomForestClassifier for Agent
+# Agent prediction
 agent_model = RandomForestClassifier(n_estimators=100, random_state=42)
 agent_model.fit(X_train, y_agent_train)
-print("Agent prediction accuracy:", agent_model.score(X_test, y_agent_test))
+accuracy = agent_model.score(X_test, y_agent_test)
+print(f"[Model Training] Agent prediction accuracy: {accuracy:.2%}")
 
-# RandomForestRegressor for sensitivity
+# Sensitivity prediction
 sens_model = RandomForestRegressor(n_estimators=100, random_state=42)
 sens_model.fit(X_train, y_sens_train)
-print("Sens prediction  R^2:", sens_model.score(X_test, y_sens_test))
+r2_score = sens_model.score(X_test, y_sens_test)
+print(f"[Model Training] Sensitivity prediction R²: {r2_score:.4f}")
 
 # -----------------------------
-# 5. Prediction function for user
+# 5. Prediction function
 # -----------------------------
 def predict_agent_sens(input_dict):
     """
     input_dict = {
-    "playstyle": "aggresive",
-    "preferred_role": "duelist",
-    "favorite_map": "Ascent",
-    "weapon_preference": "rifles",
-    "combat_distance": "mid-range",
-    "dpi": 800,
-    "edpi": 320
-
+        "playstyle": "aggressive",
+        "preferred_role": "duelist",
+        "favorite_map": "Ascent",
+        "aim_type": "precise",
+        "edpi": 320,
+        "ability_usage": 5,
+        "aggressiveness": 7,
+        "hours_played": 200
     }
     """
-
-# Create DataFrame so encoder sees valid feature names
+    # Encode categorical features
     input_df = pd.DataFrame([{
         "playstyle": input_dict["playstyle"],
         "preferred_role": input_dict["preferred_role"],
         "favorite_map": input_dict["favorite_map"],
-        "weapon_preference": input_dict["weapon_preference"],
-        "combat_distance": input_dict["combat_distance"]
+        "aim_type": input_dict["aim_type"]
     }])
 
     X_input_cat = encoder.transform(input_df)
-    X_input_final = np.hstack([X_input_cat, [[input_dict["dpi"], input_dict["edpi"]]]])
 
-# Predictions
+    # Numeric features
+    X_input_num = np.array([[input_dict["edpi"],
+                             input_dict["ability_usage"], input_dict["aggressiveness"],
+                             input_dict["hours_played"]]])
+
+    X_input_final = np.hstack([X_input_cat, X_input_num])
+
+    # Predict agent and sensitivity
     recommended_agent = agent_model.predict(X_input_final)[0]
     recommended_sens = sens_model.predict(X_input_final)[0]
 
@@ -83,15 +90,46 @@ def predict_agent_sens(input_dict):
 # 6. Usage example
 # -----------------------------
 if __name__ == "__main__":
-    example_input = {
-        "playstyle": "aggressive",
-        "preferred_role": "duelist",
-        "favorite_map": "Abyss",
-        "weapon_preference": "rifles",
-        "combat_distance": "mid-range",
-        "dpi": 800,
-        "edpi": 320
-    }
-    agent, sens = predict_agent_sens(example_input)
-    print("Recommended agent:", agent)
-    print("Recommended sens:", sens)
+    # Test with multiple profiles
+    test_profiles = [
+        {
+            "name": "Aggressive Duelist",
+            "playstyle": "aggressive",
+            "preferred_role": "duelist",
+            "favorite_map": "Ascent",
+            "aim_type": "precise",
+            "edpi": 320,
+            "ability_usage": 3,
+            "aggressiveness": 9,
+            "hours_played": 500
+        },
+        {
+            "name": "Passive Sentinel",
+            "playstyle": "passive",
+            "preferred_role": "sentinel",
+            "favorite_map": "Bind",
+            "aim_type": "spray",
+            "edpi": 220,
+            "ability_usage": 8,
+            "aggressiveness": 2,
+            "hours_played": 800
+        },
+        {
+            "name": "Balanced Initiator",
+            "playstyle": "balanced",
+            "preferred_role": "initiator",
+            "favorite_map": "Lotus",
+            "aim_type": "burst",
+            "edpi": 280,
+            "ability_usage": 7,
+            "aggressiveness": 5,
+            "hours_played": 350
+        }
+    ]
+    
+    for profile in test_profiles:
+        name = profile.pop("name")
+        agent, sens = predict_agent_sens(profile)
+        print(f"\n[{name}]")
+        print(f"  Recommended agent: {agent}")
+        print(f"  Recommended sens: {sens}")
