@@ -127,9 +127,21 @@ if __name__ == "__main__":
         }
     ]
     
+    print("\n" + "="*60)
+    print("TESTING PREDICTIONS")
+    print("="*60)
+    
     for profile in test_profiles:
         name = profile.pop("name")
-        agent, sens = predict_agent_sens(profile)
+        edpi = profile["edpi"]
+        agent, sens_800 = predict_agent_sens(profile)
+        sens_1600 = round(sens_800 / 2, 3)
+        
         print(f"\n[{name}]")
+        print(f"  Profile: {profile['playstyle']}, {profile['preferred_role']}, {profile['aim_type']}")
+        print(f"  eDPI: {edpi}")
         print(f"  Recommended agent: {agent}")
-        print(f"  Recommended sens: {sens}")
+        print(f"  Recommended sens @ 800 DPI: {sens_800}")
+        print(f"  Recommended sens @ 1600 DPI: {sens_1600}")
+    
+    print("\n" + "="*60)

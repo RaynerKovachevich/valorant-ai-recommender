@@ -4,7 +4,7 @@ import random
 NUM_PLAYERS = 5000
 
 roles = ["duelist", "initiator", "controller", "sentinel"]
-maps = ["Ascent", "Bind", "Lotus", "Split", "Icebox", "Sunset"]
+maps = ["Ascent", "Bind", "Haven", "Split", "Icebox", "Breeze", "Fracture", "Pearl", "Lotus", "Sunset", "Abyss"]
 playstyles = ["aggressive", "balanced", "passive"]
 
 agents = {
